@@ -1,6 +1,5 @@
 package com.bumptech.glide.load.resource.bitmap;
 
-import android.annotation.TargetApi;
 import android.graphics.Bitmap;
 import android.graphics.BitmapShader;
 import android.graphics.Canvas;
@@ -15,10 +14,11 @@ import android.media.ExifInterface;
 import android.os.Build;
 import android.support.annotation.NonNull;
 import android.util.Log;
-
 import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool;
 import com.bumptech.glide.util.Preconditions;
-
+import com.bumptech.glide.util.Synthetic;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -34,17 +34,22 @@ public final class TransformationUtils {
   private static final int CIRCLE_CROP_PAINT_FLAGS = PAINT_FLAGS | Paint.ANTI_ALIAS_FLAG;
   private static final Paint CIRCLE_CROP_SHAPE_PAINT = new Paint(CIRCLE_CROP_PAINT_FLAGS);
   private static final Paint CIRCLE_CROP_BITMAP_PAINT;
+
+  // See #738.
+  private static final List<String> MODELS_REQUIRING_BITMAP_LOCK =
+      Arrays.asList(
+          "XT1097",
+          "XT1085");
   /**
    * https://github.com/bumptech/glide/issues/738 On some devices (Moto X with android 5.1) bitmap
    * drawing is not thread safe.
    * This lock only locks for these specific devices. For other types of devices the lock is always
    * available and therefore does not impact performance
    */
-  private static final Lock BITMAP_DRAWABLE_LOCK = "XT1097".equals(Build.MODEL)
-      // TODO: Switch to Build.VERSION_CODES.LOLLIPOP_MR1 when apps have updated target API levels.
-      && Build.VERSION.SDK_INT == 22
-      ? new ReentrantLock()
-      : new NoLock();
+  private static final Lock BITMAP_DRAWABLE_LOCK =
+      MODELS_REQUIRING_BITMAP_LOCK.contains(Build.MODEL)
+          && Build.VERSION.SDK_INT == Build.VERSION_CODES.LOLLIPOP_MR1
+          ? new ReentrantLock() : new NoLock();
 
   static {
     CIRCLE_CROP_BITMAP_PAINT = new Paint(CIRCLE_CROP_PAINT_FLAGS);
@@ -191,14 +196,7 @@ public final class TransformationUtils {
    *                    transformation.
    */
   public static void setAlpha(Bitmap inBitmap, Bitmap outBitmap) {
-    setAlphaIfAvailable(outBitmap, inBitmap.hasAlpha());
-  }
-
-  @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR1)
-  private static void setAlphaIfAvailable(Bitmap bitmap, boolean hasAlpha) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR1 && bitmap != null) {
-      bitmap.setHasAlpha(hasAlpha);
-    }
+    outBitmap.setHasAlpha(inBitmap.hasAlpha());
   }
 
   /**
@@ -321,7 +319,7 @@ public final class TransformationUtils {
     Bitmap toTransform = getAlphaSafeBitmap(pool, inBitmap);
 
     Bitmap result = pool.get(destMinEdge, destMinEdge, Bitmap.Config.ARGB_8888);
-    setAlphaIfAvailable(result, true /*hasAlpha*/);
+    result.setHasAlpha(true);
 
     BITMAP_DRAWABLE_LOCK.lock();
     try {
@@ -377,7 +375,7 @@ public final class TransformationUtils {
     Bitmap toTransform = getAlphaSafeBitmap(pool, inBitmap);
     Bitmap result = pool.get(width, height, Bitmap.Config.ARGB_8888);
 
-    setAlphaIfAvailable(result, true /* hasAlpha */);
+    result.setHasAlpha(true);
 
     BitmapShader shader = new BitmapShader(toTransform, Shader.TileMode.CLAMP,
         Shader.TileMode.CLAMP);
@@ -456,6 +454,10 @@ public final class TransformationUtils {
   }
 
   private static final class NoLock implements Lock {
+
+    @Synthetic
+    NoLock() { }
+
     @Override
     public void lock() {
       // do nothing

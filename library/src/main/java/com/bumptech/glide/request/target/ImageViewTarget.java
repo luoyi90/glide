@@ -4,7 +4,6 @@ import android.graphics.drawable.Animatable;
 import android.graphics.drawable.Drawable;
 import android.support.annotation.Nullable;
 import android.widget.ImageView;
-
 import com.bumptech.glide.request.transition.Transition;
 
 /**
@@ -54,7 +53,7 @@ public abstract class ImageViewTarget<Z> extends ViewTarget<ImageView, Z>
   @Override
   public void onLoadStarted(@Nullable Drawable placeholder) {
     super.onLoadStarted(placeholder);
-    setResource(null);
+    setResourceInternal(null);
     setDrawable(placeholder);
   }
 
@@ -67,7 +66,7 @@ public abstract class ImageViewTarget<Z> extends ViewTarget<ImageView, Z>
   @Override
   public void onLoadFailed(@Nullable Drawable errorDrawable) {
     super.onLoadFailed(errorDrawable);
-    setResource(null);
+    setResourceInternal(null);
     setDrawable(errorDrawable);
   }
 
@@ -80,19 +79,16 @@ public abstract class ImageViewTarget<Z> extends ViewTarget<ImageView, Z>
   @Override
   public void onLoadCleared(@Nullable Drawable placeholder) {
     super.onLoadCleared(placeholder);
-    setResource(null);
+    setResourceInternal(null);
     setDrawable(placeholder);
   }
 
   @Override
   public void onResourceReady(Z resource, @Nullable Transition<? super Z> transition) {
     if (transition == null || !transition.transition(resource, this)) {
-      setResource(resource);
-    }
-
-    if (resource instanceof Animatable) {
-      animatable = (Animatable) resource;
-      animatable.start();
+      setResourceInternal(resource);
+    } else {
+      maybeUpdateAnimatable(resource);
     }
   }
 
@@ -107,6 +103,20 @@ public abstract class ImageViewTarget<Z> extends ViewTarget<ImageView, Z>
   public void onStop() {
     if (animatable != null) {
       animatable.stop();
+    }
+  }
+
+  private void setResourceInternal(@Nullable Z resource) {
+    maybeUpdateAnimatable(resource);
+    setResource(resource);
+  }
+
+  private void maybeUpdateAnimatable(@Nullable Z resource) {
+    if (resource instanceof Animatable) {
+      animatable = (Animatable) resource;
+      animatable.start();
+    } else {
+      animatable = null;
     }
   }
 

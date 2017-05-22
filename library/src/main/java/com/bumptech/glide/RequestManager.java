@@ -12,9 +12,7 @@ import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.view.View;
-
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
-import com.bumptech.glide.load.resource.bitmap.BitmapTransitionOptions;
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
 import com.bumptech.glide.load.resource.gif.GifDrawable;
 import com.bumptech.glide.manager.ConnectivityMonitor;
@@ -24,14 +22,13 @@ import com.bumptech.glide.manager.LifecycleListener;
 import com.bumptech.glide.manager.RequestManagerTreeNode;
 import com.bumptech.glide.manager.RequestTracker;
 import com.bumptech.glide.manager.TargetTracker;
-import com.bumptech.glide.request.BaseRequestOptions;
 import com.bumptech.glide.request.Request;
 import com.bumptech.glide.request.RequestOptions;
 import com.bumptech.glide.request.target.Target;
 import com.bumptech.glide.request.target.ViewTarget;
 import com.bumptech.glide.request.transition.Transition;
+import com.bumptech.glide.util.Synthetic;
 import com.bumptech.glide.util.Util;
-
 import java.io.File;
 
 /**
@@ -53,8 +50,8 @@ public class RequestManager implements LifecycleListener {
       diskCacheStrategyOf(DiskCacheStrategy.DATA).priority(Priority.LOW)
           .skipMemoryCache(true);
 
-  private final GlideContext context;
-  private final Lifecycle lifecycle;
+  protected final Glide glide;
+  @Synthetic final Lifecycle lifecycle;
   private final RequestTracker requestTracker;
   private final RequestManagerTreeNode treeNode;
   private final TargetTracker targetTracker = new TargetTracker();
@@ -68,21 +65,26 @@ public class RequestManager implements LifecycleListener {
   private final ConnectivityMonitor connectivityMonitor;
 
   @NonNull
-  private BaseRequestOptions<?> defaultRequestOptions;
-  @NonNull
-  private BaseRequestOptions<?> requestOptions;
+  private RequestOptions requestOptions;
 
-  public RequestManager(Context context, Lifecycle lifecycle, RequestManagerTreeNode treeNode) {
-    this(context, lifecycle, treeNode,
-        new RequestTracker(), Glide.get(context).getConnectivityMonitorFactory());
+  public RequestManager(Glide glide, Lifecycle lifecycle, RequestManagerTreeNode treeNode) {
+    this(glide, lifecycle, treeNode, new RequestTracker(), glide.getConnectivityMonitorFactory());
   }
 
-  RequestManager(Context context, final Lifecycle lifecycle, RequestManagerTreeNode treeNode,
-      RequestTracker requestTracker, ConnectivityMonitorFactory factory) {
-    this.context = Glide.get(context).getGlideContext();
+  // Our usage is safe here.
+  @SuppressWarnings("PMD.ConstructorCallsOverridableMethod")
+  RequestManager(
+      Glide glide,
+      Lifecycle lifecycle,
+      RequestManagerTreeNode treeNode,
+      RequestTracker requestTracker,
+      ConnectivityMonitorFactory factory) {
+    this.glide = glide;
     this.lifecycle = lifecycle;
     this.treeNode = treeNode;
     this.requestTracker = requestTracker;
+
+    final Context context = glide.getGlideContext().getBaseContext();
 
     connectivityMonitor =
         factory.build(context, new RequestManagerConnectivityListener(requestTracker));
@@ -98,10 +100,17 @@ public class RequestManager implements LifecycleListener {
     }
     lifecycle.addListener(connectivityMonitor);
 
-    defaultRequestOptions = this.context.getDefaultRequestOptions();
-    requestOptions = defaultRequestOptions;
+    setRequestOptions(glide.getGlideContext().getDefaultRequestOptions());
 
-    Glide.get(context).registerRequestManager(this);
+    glide.registerRequestManager(this);
+  }
+
+  protected void setRequestOptions(@NonNull RequestOptions toSet) {
+    this.requestOptions = toSet.clone().autoClone();
+  }
+
+  private void updateRequestOptions(RequestOptions toUpdate) {
+    this.requestOptions.apply(toUpdate);
   }
 
   /**
@@ -118,14 +127,12 @@ public class RequestManager implements LifecycleListener {
    *
    * <p>The modified options will only be applied to loads started after this method is called.
    *
-   * @see RequestBuilder#apply(BaseRequestOptions)
+   * @see RequestBuilder#apply(RequestOptions)
    *
    * @return This request manager.
    */
   public RequestManager applyDefaultRequestOptions(RequestOptions requestOptions) {
-    BaseRequestOptions<?> toMutate = this.requestOptions == defaultRequestOptions
-        ? this.requestOptions.clone() : this.defaultRequestOptions;
-    this.requestOptions = toMutate.apply(requestOptions);
+    updateRequestOptions(requestOptions);
     return this;
   }
 
@@ -147,8 +154,7 @@ public class RequestManager implements LifecycleListener {
    * @return This request manager.
    */
   public RequestManager setDefaultRequestOptions(RequestOptions requestOptions) {
-    this.defaultRequestOptions = requestOptions;
-    this.requestOptions = requestOptions;
+    setRequestOptions(requestOptions);
     return this;
   }
 
@@ -156,14 +162,14 @@ public class RequestManager implements LifecycleListener {
    * @see android.content.ComponentCallbacks2#onTrimMemory(int)
    */
   public void onTrimMemory(int level) {
-    context.onTrimMemory(level);
+    glide.getGlideContext().onTrimMemory(level);
   }
 
   /**
    * @see android.content.ComponentCallbacks2#onLowMemory()
    */
   public void onLowMemory() {
-    context.onLowMemory();
+    glide.getGlideContext().onLowMemory();
   }
 
   /**
@@ -270,7 +276,7 @@ public class RequestManager implements LifecycleListener {
     lifecycle.removeListener(this);
     lifecycle.removeListener(connectivityMonitor);
     mainHandler.removeCallbacks(addSelfToLifecycle);
-    Glide.get(context).unregisterRequestManager(this);
+    glide.unregisterRequestManager(this);
   }
 
   /**
@@ -280,7 +286,8 @@ public class RequestManager implements LifecycleListener {
    * @return A new request builder for loading a {@link android.graphics.Bitmap}
    */
   public RequestBuilder<Bitmap> asBitmap() {
-    return as(Bitmap.class).transition(new BitmapTransitionOptions()).apply(DECODE_TYPE_BITMAP);
+    return as(Bitmap.class).transition(new GenericTransitionOptions<Bitmap>())
+            .apply(DECODE_TYPE_BITMAP);
   }
 
   /**
@@ -371,7 +378,7 @@ public class RequestManager implements LifecycleListener {
    * @return A new request builder for loading the given resource class.
    */
   public <ResourceType> RequestBuilder<ResourceType> as(Class<ResourceType> resourceClass) {
-    return new RequestBuilder<>(context, this, resourceClass);
+    return new RequestBuilder<>(glide, this, resourceClass);
   }
 
   /**
@@ -384,7 +391,7 @@ public class RequestManager implements LifecycleListener {
    * @param view The view to cancel loads and free resources for.
    * @throws IllegalArgumentException if an object other than Glide's metadata is put as the view's
    *                                  tag.
-   * @see #clear(Target).
+   * @see #clear(Target)
    */
   public void clear(View view) {
     clear(new ClearTarget(view));
@@ -416,7 +423,7 @@ public class RequestManager implements LifecycleListener {
   private void untrackOrDelegate(Target<?> target) {
     boolean isOwnedByUs = untrack(target);
     if (!isOwnedByUs) {
-      Glide.get(context).removeFromManagers(target);
+      glide.removeFromManagers(target);
     }
   }
 
@@ -441,7 +448,7 @@ public class RequestManager implements LifecycleListener {
     requestTracker.runRequest(request);
   }
 
-  BaseRequestOptions<?> getDefaultRequestOptions() {
+  RequestOptions getDefaultRequestOptions() {
     return requestOptions;
   }
 

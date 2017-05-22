@@ -8,7 +8,7 @@ import android.os.Build;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
-
+import com.bumptech.glide.util.Synthetic;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -169,15 +169,8 @@ public class LruBitmapPool implements BitmapPool {
   // Setting these two values provides Bitmaps that are essentially equivalent to those returned
   // from Bitmap.createBitmap.
   private static void normalize(Bitmap bitmap) {
-    maybeSetAlpha(bitmap);
+    bitmap.setHasAlpha(true);
     maybeSetPreMultiplied(bitmap);
-  }
-
-  @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR1)
-  private static void maybeSetAlpha(Bitmap bitmap) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR1) {
-      bitmap.setHasAlpha(true);
-    }
   }
 
   @TargetApi(Build.VERSION_CODES.KITKAT)
@@ -292,6 +285,10 @@ public class LruBitmapPool implements BitmapPool {
   }
 
   private static class NullBitmapTracker implements BitmapTracker {
+
+    @Synthetic
+    NullBitmapTracker() { }
+
     @Override
     public void add(Bitmap bitmap) {
       // Do nothing.

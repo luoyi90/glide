@@ -1,14 +1,11 @@
 package com.bumptech.glide.load.model;
 
-import android.content.Context;
 import android.util.Base64;
-
 import com.bumptech.glide.Priority;
 import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.Options;
 import com.bumptech.glide.load.data.DataFetcher;
 import com.bumptech.glide.signature.ObjectKey;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,7 +17,7 @@ import java.io.InputStream;
  *
  * <p>See http://www.ietf.org/rfc/rfc2397.txt  for a complete description of the 'data' URL scheme.
  *
- * <p>Briefly, a 'data' URL has the form: <pre>data:[mediatype][;base64],somedata"</pre>
+ * <p>Briefly, a 'data' URL has the form: <pre>data:[mediatype][;base64],some_data</pre>
  *
  * @param <Data> The type of data that can be opened.
  */
@@ -148,8 +145,7 @@ public final class DataUrlLoader<Data> implements ModelLoader<String, Data> {
     }
 
     @Override
-    public final ModelLoader<String, InputStream> build(Context context,
-        MultiModelLoaderFactory multiFactory) {
+    public final ModelLoader<String, InputStream> build(MultiModelLoaderFactory multiFactory) {
       return new DataUrlLoader<>(opener);
     }
 

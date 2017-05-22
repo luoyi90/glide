@@ -4,9 +4,7 @@ import android.annotation.TargetApi;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Looper;
-
 import com.bumptech.glide.request.target.Target;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -92,7 +90,7 @@ public final class Util {
   }
 
   private static int getBytesPerPixel(Bitmap.Config config) {
-    // A bitmap by decoding a gif has null "config" in certain environments.
+    // A bitmap by decoding a GIF has null "config" in certain environments.
     if (config == null) {
       config = Bitmap.Config.ARGB_8888;
     }
@@ -152,7 +150,7 @@ public final class Util {
   }
 
   /**
-   * Returns {@code true} if called on the main thread, {@code false} otherwise.
+   * Returns {@code true} if called on a background thread, {@code false} otherwise.
    */
   public static boolean isOnBackgroundThread() {
     return !isOnMainThread();
@@ -172,13 +170,13 @@ public final class Util {
    * <p> See #303 and #375. </p>
    */
   public static <T> List<T> getSnapshot(Collection<T> other) {
-      // toArray creates a new ArrayList internally and this way we can guarantee entries will not
-      // be null. See #322.
-      List<T> result = new ArrayList<T>(other.size());
-      for (T item : other) {
-          result.add(item);
-      }
-      return result;
+    // toArray creates a new ArrayList internally and this way we can guarantee entries will not
+    // be null. See #322.
+    List<T> result = new ArrayList<T>(other.size());
+    for (T item : other) {
+      result.add(item);
+    }
+    return result;
   }
 
   /**

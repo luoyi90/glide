@@ -1,5 +1,6 @@
 package com.bumptech.glide.load.engine.prefill;
 
+import static com.bumptech.glide.tests.Util.anyResource;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertNotEquals;
 import static org.mockito.Matchers.any;
@@ -15,7 +16,6 @@ import static org.mockito.Mockito.when;
 
 import android.graphics.Bitmap;
 import android.os.Handler;
-
 import com.bumptech.glide.load.Key;
 import com.bumptech.glide.load.engine.Resource;
 import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool;
@@ -23,7 +23,10 @@ import com.bumptech.glide.load.engine.cache.MemoryCache;
 import com.bumptech.glide.load.resource.bitmap.BitmapResource;
 import com.bumptech.glide.tests.Util.CreateBitmap;
 import com.bumptech.glide.util.Util;
-
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -34,11 +37,6 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(manifest = Config.NONE, sdk = 18)
@@ -56,7 +54,7 @@ public class BitmapPreFillRunnerTest {
     doAnswer(new AddBitmapPoolAnswer(addedBitmaps)).when(pool).put(any(Bitmap.class));
     when(pool.getDirty(anyInt(), anyInt(), any(Bitmap.Config.class)))
         .thenAnswer(new CreateBitmap());
-    when(cache.put(any(Key.class), any(Resource.class)))
+    when(cache.put(any(Key.class), anyResource()))
         .thenAnswer(new AddBitmapCacheAnswer(addedBitmaps));
   }
 
@@ -131,7 +129,7 @@ public class BitmapPreFillRunnerTest {
   public void testPreFillHandlerDoesNotPostIfHasNoBitmapsToAllocate() {
     BitmapPreFillRunner handler = getHandler(new HashMap<PreFillType, Integer>());
     handler.run();
-    verify(mainHandler, never()).postDelayed(any(Runnable.class), anyInt());
+    verify(mainHandler, never()).postDelayed(any(Runnable.class), anyLong());
   }
 
   @Test
@@ -207,7 +205,7 @@ public class BitmapPreFillRunnerTest {
 
     getHandler(allocationOrder).run();
 
-    verify(cache).put(any(Key.class), any(Resource.class));
+    verify(cache).put(any(Key.class), anyResource());
     verify(pool, never()).put(any(Bitmap.class));
     // TODO(b/20335397): This code was relying on Bitmap equality which Robolectric removed
     // assertThat(addedBitmaps).containsExactly(bitmap);
@@ -226,7 +224,7 @@ public class BitmapPreFillRunnerTest {
 
     getHandler(allocationOrder).run();
 
-    verify(cache, never()).put(any(Key.class), any(Resource.class));
+    verify(cache, never()).put(any(Key.class), anyResource());
     // TODO(b/20335397): This code was relying on Bitmap equality which Robolectric removed
     // verify(pool).put(eq(bitmap));
     // assertThat(addedBitmaps).containsExactly(bitmap);
@@ -245,7 +243,7 @@ public class BitmapPreFillRunnerTest {
 
     getHandler(allocationOrder).run();
 
-    verify(cache, never()).put(any(Key.class), any(Resource.class));
+    verify(cache, never()).put(any(Key.class), anyResource());
     // TODO(b/20335397): This code was relying on Bitmap equality which Robolectric removed
     //verify(pool).put(eq(bitmap));
     //assertThat(addedBitmaps).containsExactly(bitmap);

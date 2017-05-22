@@ -1,7 +1,7 @@
 package com.bumptech.glide.load.engine.bitmap_recycle;
 /**
  * Interface for handling operations on a primitive array type.
- * @param <T> Array type (eg byte[], int[])
+ * @param <T> Array type (e.g. byte[], int[])
  */
 public interface ArrayAdapterInterface<T> {
 
@@ -14,11 +14,6 @@ public interface ArrayAdapterInterface<T> {
    * Return the length of the given array.
    */
   int getArrayLength(T array);
-
-  /**
-   * Reset the array for re-use (e.g. set all values to 0).
-   */
-  void resetArray(T array);
 
   /**
    * Allocate and return an array of the specified size.

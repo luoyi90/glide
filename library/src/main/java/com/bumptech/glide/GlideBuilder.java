@@ -1,14 +1,12 @@
 package com.bumptech.glide;
 
 import android.content.Context;
-import android.os.Build;
+import android.support.annotation.Nullable;
 import android.util.Log;
-
 import com.bumptech.glide.load.DecodeFormat;
 import com.bumptech.glide.load.engine.Engine;
 import com.bumptech.glide.load.engine.bitmap_recycle.ArrayPool;
 import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool;
-import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPoolAdapter;
 import com.bumptech.glide.load.engine.bitmap_recycle.LruArrayPool;
 import com.bumptech.glide.load.engine.bitmap_recycle.LruBitmapPool;
 import com.bumptech.glide.load.engine.cache.DiskCache;
@@ -19,14 +17,14 @@ import com.bumptech.glide.load.engine.cache.MemorySizeCalculator;
 import com.bumptech.glide.load.engine.executor.GlideExecutor;
 import com.bumptech.glide.manager.ConnectivityMonitorFactory;
 import com.bumptech.glide.manager.DefaultConnectivityMonitorFactory;
+import com.bumptech.glide.manager.RequestManagerRetriever;
+import com.bumptech.glide.manager.RequestManagerRetriever.RequestManagerFactory;
 import com.bumptech.glide.request.RequestOptions;
 
 /**
  * A builder class for setting default structural classes for Glide to use.
  */
 public final class GlideBuilder {
-  private final Context context;
-
   private Engine engine;
   private BitmapPool bitmapPool;
   private ArrayPool arrayPool;
@@ -38,10 +36,8 @@ public final class GlideBuilder {
   private ConnectivityMonitorFactory connectivityMonitorFactory;
   private int logLevel = Log.INFO;
   private RequestOptions defaultRequestOptions = new RequestOptions();
-
-  GlideBuilder(Context context) {
-    this.context = context.getApplicationContext();
-  }
+  @Nullable
+  private RequestManagerFactory requestManagerFactory;
 
   /**
    * Sets the {@link com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool} implementation to use
@@ -150,7 +146,7 @@ public final class GlideBuilder {
    * Sets the default {@link RequestOptions} to use for all loads across the app.
    *
    * <p>Applying additional options with {@link
-   * RequestBuilder#apply(com.bumptech.glide.request.BaseRequestOptions)} will override defaults
+   * RequestBuilder#apply(RequestOptions)} will override defaults
    * set here.
    *
    * @param requestOptions The options to use by default.
@@ -255,16 +251,23 @@ public final class GlideBuilder {
     return this;
   }
 
+  GlideBuilder setRequestManagerFactory(
+      @Nullable RequestManagerRetriever.RequestManagerFactory factory) {
+    this.requestManagerFactory = factory;
+    return this;
+  }
+
   // For testing.
   GlideBuilder setEngine(Engine engine) {
     this.engine = engine;
     return this;
   }
 
-  Glide createGlide() {
+  public Glide build(Context context) {
     if (sourceExecutor == null) {
       sourceExecutor = GlideExecutor.newSourceExecutor();
     }
+
     if (diskCacheExecutor == null) {
       diskCacheExecutor = GlideExecutor.newDiskCacheExecutor();
     }
@@ -278,12 +281,8 @@ public final class GlideBuilder {
     }
 
     if (bitmapPool == null) {
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-        int size = memorySizeCalculator.getBitmapPoolSize();
-        bitmapPool = new LruBitmapPool(size);
-      } else {
-        bitmapPool = new BitmapPoolAdapter();
-      }
+      int size = memorySizeCalculator.getBitmapPoolSize();
+      bitmapPool = new LruBitmapPool(size);
     }
 
     if (arrayPool == null) {
@@ -299,8 +298,12 @@ public final class GlideBuilder {
     }
 
     if (engine == null) {
-      engine = new Engine(memoryCache, diskCacheFactory, diskCacheExecutor, sourceExecutor);
+      engine = new Engine(memoryCache, diskCacheFactory, diskCacheExecutor, sourceExecutor,
+          GlideExecutor.newUnlimitedSourceExecutor());
     }
+
+    RequestManagerRetriever requestManagerRetriever = new RequestManagerRetriever(
+        requestManagerFactory);
 
     return new Glide(
         context,
@@ -308,6 +311,7 @@ public final class GlideBuilder {
         memoryCache,
         bitmapPool,
         arrayPool,
+        requestManagerRetriever,
         connectivityMonitorFactory,
         logLevel,
         defaultRequestOptions.lock());

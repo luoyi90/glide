@@ -10,7 +10,6 @@ import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
 import android.graphics.Bitmap;
 import android.widget.RemoteViews;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -19,7 +18,7 @@ import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.Implementation;
 import org.robolectric.annotation.Implements;
-import org.robolectric.internal.ShadowExtractor;
+import org.robolectric.shadow.api.Shadow;
 import org.robolectric.shadows.ShadowAppWidgetManager;
 
 @RunWith(RobolectricTestRunner.class)
@@ -32,7 +31,7 @@ public class AppWidgetTargetTest {
 
   @Before
   public void setUp() {
-    shadowManager = (UpdateShadowAppWidgetManager) ShadowExtractor
+    shadowManager = (UpdateShadowAppWidgetManager) Shadow
         .extract(AppWidgetManager.getInstance(RuntimeEnvironment.application));
     viewId = 1234;
     views = mock(RemoteViews.class);

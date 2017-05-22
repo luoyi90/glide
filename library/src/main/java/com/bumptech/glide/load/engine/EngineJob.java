@@ -4,15 +4,14 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.support.v4.util.Pools;
-
 import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.Key;
 import com.bumptech.glide.load.engine.executor.GlideExecutor;
 import com.bumptech.glide.request.ResourceCallback;
+import com.bumptech.glide.util.Synthetic;
 import com.bumptech.glide.util.Util;
 import com.bumptech.glide.util.pool.FactoryPools.Poolable;
 import com.bumptech.glide.util.pool.StateVerifier;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,9 +38,11 @@ class EngineJob<R> implements DecodeJob.Callback<R>,
   private final EngineJobListener listener;
   private final GlideExecutor diskCacheExecutor;
   private final GlideExecutor sourceExecutor;
+  private final GlideExecutor sourceUnlimitedExecutor;
 
   private Key key;
   private boolean isCacheable;
+  private boolean useUnlimitedSourceGeneratorPool;
   private Resource<?> resource;
   private DataSource dataSource;
   private boolean hasResource;
@@ -57,31 +58,38 @@ class EngineJob<R> implements DecodeJob.Callback<R>,
   private volatile boolean isCancelled;
 
   EngineJob(GlideExecutor diskCacheExecutor, GlideExecutor sourceExecutor,
+      GlideExecutor sourceUnlimitedExecutor,
       EngineJobListener listener, Pools.Pool<EngineJob<?>> pool) {
-    this(diskCacheExecutor, sourceExecutor, listener, pool, DEFAULT_FACTORY);
+    this(diskCacheExecutor, sourceExecutor, sourceUnlimitedExecutor, listener, pool,
+        DEFAULT_FACTORY);
   }
 
   // Visible for testing.
   EngineJob(GlideExecutor diskCacheExecutor, GlideExecutor sourceExecutor,
+      GlideExecutor sourceUnlimitedExecutor,
       EngineJobListener listener, Pools.Pool<EngineJob<?>> pool,
       EngineResourceFactory engineResourceFactory) {
     this.diskCacheExecutor = diskCacheExecutor;
     this.sourceExecutor = sourceExecutor;
+    this.sourceUnlimitedExecutor = sourceUnlimitedExecutor;
     this.listener = listener;
     this.pool = pool;
     this.engineResourceFactory = engineResourceFactory;
   }
 
   // Visible for testing.
-  EngineJob<R> init(Key key, boolean isCacheable) {
+  EngineJob<R> init(Key key, boolean isCacheable, boolean useUnlimitedSourceGeneratorPool) {
     this.key = key;
     this.isCacheable = isCacheable;
+    this.useUnlimitedSourceGeneratorPool = useUnlimitedSourceGeneratorPool;
     return this;
   }
 
   public void start(DecodeJob<R> decodeJob) {
     this.decodeJob = decodeJob;
-    GlideExecutor executor = decodeJob.willDecodeFromCache() ? diskCacheExecutor : sourceExecutor;
+    GlideExecutor executor = decodeJob.willDecodeFromCache()
+        ? diskCacheExecutor
+        : getActiveSourceExecutor();
     executor.execute(decodeJob);
   }
 
@@ -110,6 +118,10 @@ class EngineJob<R> implements DecodeJob.Callback<R>,
     }
   }
 
+  private GlideExecutor getActiveSourceExecutor() {
+    return useUnlimitedSourceGeneratorPool ? sourceUnlimitedExecutor : sourceExecutor;
+  }
+
   // We cannot remove callbacks while notifying our list of callbacks directly because doing so
   // would cause a ConcurrentModificationException. However, we need to obey the cancellation
   // request such that if notifying a callback early in the callbacks list cancels a callback later
@@ -136,8 +148,9 @@ class EngineJob<R> implements DecodeJob.Callback<R>,
 
     isCancelled = true;
     decodeJob.cancel();
-    boolean isPendingJobRemoved =
-        diskCacheExecutor.remove(decodeJob) || sourceExecutor.remove(decodeJob);
+    boolean isPendingJobRemoved = diskCacheExecutor.remove(decodeJob)
+        || sourceExecutor.remove(decodeJob)
+        || sourceUnlimitedExecutor.remove(decodeJob);
     listener.onEngineJobCancelled(this, key);
 
     if (isPendingJobRemoved) {
@@ -150,7 +163,8 @@ class EngineJob<R> implements DecodeJob.Callback<R>,
     return isCancelled;
   }
 
-  private void handleResultOnMainThread() {
+  @Synthetic
+  void handleResultOnMainThread() {
     stateVerifier.throwIfRecycled();
     if (isCancelled) {
       resource.recycle();
@@ -181,7 +195,8 @@ class EngineJob<R> implements DecodeJob.Callback<R>,
     release(false /*isRemovedFromQueue*/);
   }
 
-  private void handleCancelledOnMainThread() {
+  @Synthetic
+  void handleCancelledOnMainThread() {
     stateVerifier.throwIfRecycled();
     if (!isCancelled) {
       throw new IllegalStateException("Not cancelled");
@@ -227,11 +242,12 @@ class EngineJob<R> implements DecodeJob.Callback<R>,
     if (isCancelled) {
       MAIN_THREAD_HANDLER.obtainMessage(MSG_CANCELLED, this).sendToTarget();
     } else {
-      sourceExecutor.execute(job);
+      getActiveSourceExecutor().execute(job);
     }
   }
 
-  private void handleExceptionOnMainThread() {
+  @Synthetic
+  void handleExceptionOnMainThread() {
     stateVerifier.throwIfRecycled();
     if (isCancelled) {
       release(false /*isRemovedFromQueue*/);
@@ -268,9 +284,12 @@ class EngineJob<R> implements DecodeJob.Callback<R>,
 
   private static class MainThreadCallback implements Handler.Callback {
 
+    @Synthetic
+    MainThreadCallback() { }
+
     @Override
     public boolean handleMessage(Message message) {
-      EngineJob job = (EngineJob) message.obj;
+      EngineJob<?> job = (EngineJob<?>) message.obj;
       switch (message.what) {
         case MSG_COMPLETE:
           job.handleResultOnMainThread();

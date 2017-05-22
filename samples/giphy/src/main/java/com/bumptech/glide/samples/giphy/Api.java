@@ -1,11 +1,9 @@
 package com.bumptech.glide.samples.giphy;
 
-import com.google.gson.Gson;
-
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
-
+import com.google.gson.Gson;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -26,7 +24,7 @@ public final class Api {
   private static final String TRENDING_PATH = "v1/gifs/trending";
   private final Handler bgHandler;
   private final Handler mainHandler;
-  private final HashSet<Monitor> monitors = new HashSet<Monitor>();
+  private final HashSet<Monitor> monitors = new HashSet<>();
 
   private static String signUrl(String url) {
     return url + "&api_key=" + BETA_KEY;
@@ -154,7 +152,7 @@ public final class Api {
    */
   public static class GifResult {
     public String id;
-    // Page url not gif url
+    // Page url not GIF url
     public String url;
     public GifUrlSet images;
 

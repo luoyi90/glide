@@ -3,10 +3,8 @@ package com.bumptech.glide.load.engine;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
-
 import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.Key;
-
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.PrintWriter;
@@ -59,10 +57,10 @@ public final class GlideException extends Exception {
   /**
    * Returns a list of causes that are immediate children of this exception.
    *
-   * @see #getRootCauses().
-   *
    * <p>Causes may or may not be {@link GlideException GlideExceptions}. Causes may also not be root
-   * causes, and in turn my have been caused by other failures.
+   * causes, and in turn my have been caused by other failures.</p>
+   *
+   * @see #getRootCauses()
    */
   public List<Exception> getCauses() {
     return causes;

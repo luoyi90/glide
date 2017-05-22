@@ -1,10 +1,10 @@
 package com.bumptech.glide.load.engine.bitmap_recycle;
 
 import android.support.annotation.Nullable;
+import android.support.annotation.VisibleForTesting;
 import android.util.Log;
-
 import com.bumptech.glide.util.Preconditions;
-
+import com.bumptech.glide.util.Synthetic;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NavigableMap;
@@ -15,9 +15,11 @@ import java.util.TreeMap;
  * the maximum byte size.
  */
 public final class LruArrayPool implements ArrayPool {
+  // 4MB.
+  static final int DEFAULT_SIZE = 4 * 1024 * 1024;
 
   /**
-   * The maximum number of times larger an int array may be to be than a requested size to eligble
+   * The maximum number of times larger an int array may be to be than a requested size to eligible
    * to be returned from the pool.
    */
   private static final int MAX_OVER_SIZE_MULTIPLE = 8;
@@ -26,10 +28,15 @@ public final class LruArrayPool implements ArrayPool {
 
   private final GroupedLinkedMap<Key, Object> groupedMap = new GroupedLinkedMap<>();
   private final KeyPool keyPool = new KeyPool();
-  private final Map<Class, NavigableMap<Integer, Integer>> sortedSizes = new HashMap<>();
-  private final Map<Class, ArrayAdapterInterface> adapters = new HashMap<>();
+  private final Map<Class<?>, NavigableMap<Integer, Integer>> sortedSizes = new HashMap<>();
+  private final Map<Class<?>, ArrayAdapterInterface<?>> adapters = new HashMap<>();
   private final int maxSize;
   private int currentSize;
+
+  @VisibleForTesting
+  public LruArrayPool() {
+    maxSize = DEFAULT_SIZE;
+  }
 
   /**
    * Constructor for a new pool.
@@ -44,7 +51,8 @@ public final class LruArrayPool implements ArrayPool {
   public synchronized <T> void put(T array, Class<T> arrayClass) {
     ArrayAdapterInterface<T> arrayAdapter = getAdapterFromType(arrayClass);
     int size = arrayAdapter.getArrayLength(array);
-    if (!isSmallEnoughForReuse(size)) {
+    int arrayBytes = size * arrayAdapter.getElementSizeInBytes();
+    if (!isSmallEnoughForReuse(arrayBytes)) {
       return;
     }
     Key key = keyPool.get(size, arrayClass);
@@ -53,7 +61,7 @@ public final class LruArrayPool implements ArrayPool {
     NavigableMap<Integer, Integer> sizes = getSizesForAdapter(arrayClass);
     Integer current = sizes.get(key.size);
     sizes.put(key.size, current == null ? 1 : current + 1);
-    currentSize += size * arrayAdapter.getElementSizeInBytes();
+    currentSize += arrayBytes;
     evict();
   }
 
@@ -77,9 +85,7 @@ public final class LruArrayPool implements ArrayPool {
       }
     }
 
-    if (result != null) {
-      arrayAdapter.resetArray(result);
-    } else {
+    if (result == null) {
       if (Log.isLoggable(arrayAdapter.getTag(), Log.VERBOSE)) {
         Log.v(arrayAdapter.getTag(), "Allocated " + size + " bytes");
       }
@@ -94,8 +100,8 @@ public final class LruArrayPool implements ArrayPool {
     return (T) groupedMap.get(key);
   }
 
-  private boolean isSmallEnoughForReuse(int intSize) {
-    return intSize <= maxSize / SINGLE_ARRAY_MAX_SIZE_DIVISOR;
+  private boolean isSmallEnoughForReuse(int byteSize) {
+    return byteSize <= maxSize / SINGLE_ARRAY_MAX_SIZE_DIVISOR;
   }
 
   private boolean mayFillRequest(int requestedSize, Integer actualSize) {
@@ -168,7 +174,7 @@ public final class LruArrayPool implements ArrayPool {
 
   @SuppressWarnings("unchecked")
   private <T> ArrayAdapterInterface<T> getAdapterFromType(Class<T> arrayPoolClass) {
-    ArrayAdapterInterface adapter = adapters.get(arrayPoolClass);
+    ArrayAdapterInterface<?> adapter = adapters.get(arrayPoolClass);
     if (adapter == null) {
       if (arrayPoolClass.equals(int[].class)) {
         adapter = new IntegerArrayAdapter();
@@ -180,7 +186,7 @@ public final class LruArrayPool implements ArrayPool {
       }
       adapters.put(arrayPoolClass, adapter);
     }
-    return adapter;
+    return (ArrayAdapterInterface<T>) adapter;
   }
 
   // VisibleForTesting
@@ -197,7 +203,10 @@ public final class LruArrayPool implements ArrayPool {
 
   private static final class KeyPool extends BaseKeyPool<Key> {
 
-    Key get(int size, Class arrayClass) {
+    @Synthetic
+    KeyPool() { }
+
+    Key get(int size, Class<?> arrayClass) {
       Key result = get();
       result.init(size, arrayClass);
       return result;
@@ -211,14 +220,14 @@ public final class LruArrayPool implements ArrayPool {
 
   private static final class Key implements Poolable {
     private final KeyPool pool;
-    private int size;
-    private Class arrayClass;
+    @Synthetic int size;
+    private Class<?> arrayClass;
 
     Key(KeyPool pool) {
       this.pool = pool;
     }
 
-    void init(int length, Class arrayClass) {
+    void init(int length, Class<?> arrayClass) {
       this.size = length;
       this.arrayClass = arrayClass;
     }

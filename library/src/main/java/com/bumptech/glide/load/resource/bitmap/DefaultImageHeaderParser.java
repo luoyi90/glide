@@ -1,16 +1,15 @@
 package com.bumptech.glide.load.resource.bitmap;
 
-import static com.bumptech.glide.load.resource.bitmap.ImageHeaderParser.ImageType.GIF;
-import static com.bumptech.glide.load.resource.bitmap.ImageHeaderParser.ImageType.JPEG;
-import static com.bumptech.glide.load.resource.bitmap.ImageHeaderParser.ImageType.PNG;
-import static com.bumptech.glide.load.resource.bitmap.ImageHeaderParser.ImageType.PNG_A;
-import static com.bumptech.glide.load.resource.bitmap.ImageHeaderParser.ImageType.UNKNOWN;
+import static com.bumptech.glide.load.ImageHeaderParser.ImageType.GIF;
+import static com.bumptech.glide.load.ImageHeaderParser.ImageType.JPEG;
+import static com.bumptech.glide.load.ImageHeaderParser.ImageType.PNG;
+import static com.bumptech.glide.load.ImageHeaderParser.ImageType.PNG_A;
+import static com.bumptech.glide.load.ImageHeaderParser.ImageType.UNKNOWN;
 
 import android.util.Log;
-
-import com.bumptech.glide.load.engine.bitmap_recycle.ByteArrayPool;
+import com.bumptech.glide.load.ImageHeaderParser;
+import com.bumptech.glide.load.engine.bitmap_recycle.ArrayPool;
 import com.bumptech.glide.util.Preconditions;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -20,59 +19,25 @@ import java.nio.charset.Charset;
 /**
  * A class for parsing the exif orientation and other data from an image header.
  */
-public class ImageHeaderParser {
-  private static final String TAG = "ImageHeaderParser";
-  /**
-   * A constant indicating we were unable to parse the orientation from the image either because
-   * no exif segment containing orientation data existed, or because of an I/O error attempting to
-   * read the exif segment.
-   */
-  public static final int UNKNOWN_ORIENTATION = -1;
-
-  /**
-   * The format of the image data including whether or not the image may include transparent
-   * pixels.
-   */
-  public enum ImageType {
-    GIF(true),
-    JPEG(false),
-    /** PNG type with alpha. */
-    PNG_A(true),
-    /** PNG type without alpha. */
-    PNG(false),
-    /** WebP type with alpha. */
-    WEBP_A(true),
-    /** WebP type without alpha. */
-    WEBP(false),
-    /**
-     * Unrecognized type.
-     */
-    UNKNOWN(false);
-    private final boolean hasAlpha;
-
-    ImageType(boolean hasAlpha) {
-      this.hasAlpha = hasAlpha;
-    }
-
-    public boolean hasAlpha() {
-      return hasAlpha;
-    }
-  }
+public final class DefaultImageHeaderParser implements ImageHeaderParser {
+  // Due to https://code.google.com/p/android/issues/detail?id=97751.
+  // TAG needs to be under 23 chars, so "Default" > "Dflt".
+  private static final String TAG = "DfltImageHeaderParser";
 
   private static final int GIF_HEADER = 0x474946;
   private static final int PNG_HEADER = 0x89504E47;
-  private static final int EXIF_MAGIC_NUMBER = 0xFFD8;
+  static final int EXIF_MAGIC_NUMBER = 0xFFD8;
   // "MM".
   private static final int MOTOROLA_TIFF_MAGIC_NUMBER = 0x4D4D;
   // "II".
   private static final int INTEL_TIFF_MAGIC_NUMBER = 0x4949;
-  private static final String JPEG_EXIF_SEGMENT_PREAMBLE = "Exif\0\0";
-  private static final byte[] JPEG_EXIF_SEGMENT_PREAMBLE_BYTES =
+  static final String JPEG_EXIF_SEGMENT_PREAMBLE = "Exif\0\0";
+  static final byte[] JPEG_EXIF_SEGMENT_PREAMBLE_BYTES =
       JPEG_EXIF_SEGMENT_PREAMBLE.getBytes(Charset.forName("UTF-8"));
   private static final int SEGMENT_SOS = 0xDA;
   private static final int MARKER_EOI = 0xD9;
-  private static final int SEGMENT_START_ID = 0xFF;
-  private static final int EXIF_SEGMENT_TYPE = 0xE1;
+  static final int SEGMENT_START_ID = 0xFF;
+  static final int EXIF_SEGMENT_TYPE = 0xE1;
   private static final int ORIENTATION_TAG_TYPE = 0x0112;
   private static final int[] BYTES_PER_FORMAT = { 0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8 };
   // WebP-related
@@ -91,28 +56,29 @@ public class ImageHeaderParser {
   private static final int WEBP_EXTENDED_ALPHA_FLAG = 1 << 4;
   private static final int WEBP_LOSSLESS_ALPHA_FLAG = 1 << 3;
 
-  private final ByteArrayPool byteArrayPool;
-  private final Reader reader;
-
-  public ImageHeaderParser(InputStream is, ByteArrayPool byteArrayPool) {
-    Preconditions.checkNotNull(is);
-    this.byteArrayPool = Preconditions.checkNotNull(byteArrayPool);
-    reader = new StreamReader(is);
+  @Override
+  public ImageType getType(InputStream is) throws IOException {
+    return getType(new StreamReader(Preconditions.checkNotNull(is)));
   }
 
-  public ImageHeaderParser(ByteBuffer byteBuffer, ByteArrayPool byteArrayPool) {
-    Preconditions.checkNotNull(byteBuffer);
-    this.byteArrayPool = Preconditions.checkNotNull(byteArrayPool);
-    reader = new ByteBufferReader(byteBuffer);
+  @Override
+  public ImageType getType(ByteBuffer byteBuffer) throws IOException {
+    return getType(new ByteBufferReader(Preconditions.checkNotNull(byteBuffer)));
   }
 
-  // 0xD0A3C68 -> <htm
-  // 0xCAFEBABE -> <!DOCTYPE...
-  public boolean hasAlpha() throws IOException {
-    return getType().hasAlpha();
+  @Override
+  public int getOrientation(InputStream is, ArrayPool byteArrayPool) throws IOException {
+    return getOrientation(new StreamReader(Preconditions.checkNotNull(is)),
+        Preconditions.checkNotNull(byteArrayPool));
   }
 
-  public ImageType getType() throws IOException {
+  @Override
+  public int getOrientation(ByteBuffer byteBuffer, ArrayPool byteArrayPool) throws IOException {
+    return getOrientation(new ByteBufferReader(Preconditions.checkNotNull(byteBuffer)),
+        Preconditions.checkNotNull(byteArrayPool));
+  }
+
+  private ImageType getType(Reader reader) throws IOException {
     int firstTwoBytes = reader.getUInt16();
 
     // JPEG.
@@ -173,7 +139,7 @@ public class ImageHeaderParser {
    * contain an orientation
    * @throws IOException
    */
-  public int getOrientation() throws IOException {
+  private int getOrientation(Reader reader, ArrayPool byteArrayPool) throws IOException {
     final int magicNumber = reader.getUInt16();
 
     if (!handles(magicNumber)) {
@@ -182,7 +148,7 @@ public class ImageHeaderParser {
       }
       return UNKNOWN_ORIENTATION;
     } else {
-      int exifSegmentLength = moveToExifSegmentAndGetLength();
+      int exifSegmentLength = moveToExifSegmentAndGetLength(reader);
       if (exifSegmentLength == -1) {
         if (Log.isLoggable(TAG, Log.DEBUG)) {
           Log.d(TAG, "Failed to parse exif segment length, or exif segment not found");
@@ -190,16 +156,17 @@ public class ImageHeaderParser {
         return UNKNOWN_ORIENTATION;
       }
 
-      byte[] exifData = byteArrayPool.get(exifSegmentLength);
+      byte[] exifData = byteArrayPool.get(exifSegmentLength, byte[].class);
       try {
-        return parseExifSegment(exifData, exifSegmentLength);
+        return parseExifSegment(reader, exifData, exifSegmentLength);
       } finally {
-        byteArrayPool.put(exifData);
+        byteArrayPool.put(exifData, byte[].class);
       }
     }
   }
 
-  private int parseExifSegment(byte[] tempArray, int exifSegmentLength) throws IOException {
+  private int parseExifSegment(Reader reader, byte[] tempArray, int exifSegmentLength)
+      throws IOException {
     int read = reader.read(tempArray, exifSegmentLength);
     if (read != exifSegmentLength) {
       if (Log.isLoggable(TAG, Log.DEBUG)) {
@@ -239,7 +206,7 @@ public class ImageHeaderParser {
    * Moves reader to the start of the exif segment and returns the length of the exif segment or
    * {@code -1} if no exif segment is found.
    */
-  private int moveToExifSegmentAndGetLength() throws IOException {
+  private int moveToExifSegmentAndGetLength(Reader reader) throws IOException {
     short segmentId, segmentType;
     int segmentLength;
     while (true) {
@@ -379,29 +346,33 @@ public class ImageHeaderParser {
         || imageMagicNumber == INTEL_TIFF_MAGIC_NUMBER;
   }
 
-  private static class RandomAccessReader {
+  private static final class RandomAccessReader {
     private final ByteBuffer data;
 
-    public RandomAccessReader(byte[] data, int length) {
+    RandomAccessReader(byte[] data, int length) {
       this.data = (ByteBuffer) ByteBuffer.wrap(data)
           .order(ByteOrder.BIG_ENDIAN)
           .limit(length);
     }
 
-    public void order(ByteOrder byteOrder) {
+    void order(ByteOrder byteOrder) {
       this.data.order(byteOrder);
     }
 
-    public int length() {
+    int length() {
       return data.remaining();
     }
 
-    public int getInt32(int offset) {
-      return data.getInt(offset);
+    int getInt32(int offset) {
+      return isAvailable(offset, 4) ? data.getInt(offset) : -1;
     }
 
-    public short getInt16(int offset) {
-      return data.getShort(offset);
+    short getInt16(int offset) {
+      return isAvailable(offset, 2) ? data.getShort(offset) : -1;
+    }
+
+    private boolean isAvailable(int offset, int byteSize) {
+      return data.remaining() - offset >= byteSize;
     }
   }
 
@@ -413,11 +384,11 @@ public class ImageHeaderParser {
     int getByte() throws IOException;
   }
 
-  private static class ByteBufferReader implements Reader {
+  private static final class ByteBufferReader implements Reader {
 
     private final ByteBuffer byteBuffer;
 
-    public ByteBufferReader(ByteBuffer byteBuffer) {
+    ByteBufferReader(ByteBuffer byteBuffer) {
       this.byteBuffer = byteBuffer;
       byteBuffer.order(ByteOrder.BIG_ENDIAN);
     }
@@ -442,7 +413,10 @@ public class ImageHeaderParser {
     @Override
     public int read(byte[] buffer, int byteCount) throws IOException {
       int toRead = Math.min(byteCount, byteBuffer.remaining());
-      byteBuffer.get(buffer, 0 /*dstOffset*/, byteCount);
+      if (toRead == 0) {
+        return -1;
+      }
+      byteBuffer.get(buffer, 0 /*dstOffset*/, toRead);
       return toRead;
     }
 
@@ -455,10 +429,10 @@ public class ImageHeaderParser {
     }
   }
 
-  private static class StreamReader implements Reader {
+  private static final class StreamReader implements Reader {
     private final InputStream is;
     // Motorola / big endian byte order.
-    public StreamReader(InputStream is) {
+    StreamReader(InputStream is) {
       this.is = is;
     }
 
@@ -515,4 +489,3 @@ public class ImageHeaderParser {
     }
   }
 }
-

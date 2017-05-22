@@ -1,15 +1,12 @@
 package com.bumptech.glide.load.model;
 
-import android.content.Context;
 import android.os.ParcelFileDescriptor;
 import android.util.Log;
-
 import com.bumptech.glide.Priority;
 import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.Options;
 import com.bumptech.glide.load.data.DataFetcher;
 import com.bumptech.glide.signature.ObjectKey;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -115,8 +112,7 @@ public class FileLoader<Data> implements ModelLoader<File, Data> {
     }
 
     @Override
-    public final ModelLoader<File, Data> build(Context context,
-        MultiModelLoaderFactory multiFactory) {
+    public final ModelLoader<File, Data> build(MultiModelLoaderFactory multiFactory) {
       return new FileLoader<>(opener);
     }
 

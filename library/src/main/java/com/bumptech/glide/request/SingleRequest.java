@@ -5,7 +5,6 @@ import android.graphics.drawable.Drawable;
 import android.support.v4.content.res.ResourcesCompat;
 import android.support.v4.util.Pools;
 import android.util.Log;
-
 import com.bumptech.glide.GlideContext;
 import com.bumptech.glide.Priority;
 import com.bumptech.glide.load.DataSource;
@@ -17,6 +16,7 @@ import com.bumptech.glide.request.target.Target;
 import com.bumptech.glide.request.transition.Transition;
 import com.bumptech.glide.request.transition.TransitionFactory;
 import com.bumptech.glide.util.LogTime;
+import com.bumptech.glide.util.Synthetic;
 import com.bumptech.glide.util.Util;
 import com.bumptech.glide.util.pool.FactoryPools;
 import com.bumptech.glide.util.pool.StateVerifier;
@@ -85,7 +85,7 @@ public final class SingleRequest<R> implements Request,
   private GlideContext glideContext;
   private Object model;
   private Class<R> transcodeClass;
-  private BaseRequestOptions<?> requestOptions;
+  private RequestOptions requestOptions;
   private int overrideWidth;
   private int overrideHeight;
   private Priority priority;
@@ -107,7 +107,7 @@ public final class SingleRequest<R> implements Request,
       GlideContext glideContext,
       Object model,
       Class<R> transcodeClass,
-      BaseRequestOptions<?> requestOptions,
+      RequestOptions requestOptions,
       int overrideWidth,
       int overrideHeight,
       Priority priority,
@@ -137,7 +137,8 @@ public final class SingleRequest<R> implements Request,
     return request;
   }
 
-  private SingleRequest() {
+  @Synthetic
+  SingleRequest() {
     // just create, instances are reused with recycle/init
   }
 
@@ -145,7 +146,7 @@ public final class SingleRequest<R> implements Request,
       GlideContext glideContext,
       Object model,
       Class<R> transcodeClass,
-      BaseRequestOptions<?> requestOptions,
+      RequestOptions requestOptions,
       int overrideWidth,
       int overrideHeight,
       Priority priority,
@@ -237,6 +238,7 @@ public final class SingleRequest<R> implements Request,
    */
   void cancel() {
     stateVerifier.throwIfRecycled();
+    target.removeCallback(this);
     status = Status.CANCELLED;
     if (loadStatus != null) {
       loadStatus.cancel();
@@ -281,7 +283,7 @@ public final class SingleRequest<R> implements Request,
     status = Status.PAUSED;
   }
 
-  private void releaseResource(Resource resource) {
+  private void releaseResource(Resource<?> resource) {
     engine.release(resource);
     this.resource = null;
   }
@@ -341,9 +343,9 @@ public final class SingleRequest<R> implements Request,
     return fallbackDrawable;
   }
 
-  private Drawable loadDrawable(int resouceId) {
+  private Drawable loadDrawable(int resourceId) {
     Resources resources = glideContext.getResources();
-    return ResourcesCompat.getDrawable(resources, resouceId, requestOptions.getTheme());
+    return ResourcesCompat.getDrawable(resources, resourceId, requestOptions.getTheme());
   }
 
   private void setErrorPlaceholder() {
@@ -373,8 +375,8 @@ public final class SingleRequest<R> implements Request,
     status = Status.RUNNING;
 
     float sizeMultiplier = requestOptions.getSizeMultiplier();
-    this.width = Math.round(sizeMultiplier * width);
-    this.height = Math.round(sizeMultiplier * height);
+    this.width = maybeApplySizeMultiplier(width, sizeMultiplier);
+    this.height = maybeApplySizeMultiplier(height, sizeMultiplier);
 
     if (Log.isLoggable(TAG, Log.VERBOSE)) {
       logV("finished setup for calling load in " + LogTime.getElapsedMillis(startTime));
@@ -393,10 +395,16 @@ public final class SingleRequest<R> implements Request,
         requestOptions.isTransformationRequired(),
         requestOptions.getOptions(),
         requestOptions.isMemoryCacheable(),
+        requestOptions.getUseUnlimitedSourceGeneratorsPool(),
+        requestOptions.getOnlyRetrieveFromCache(),
         this);
     if (Log.isLoggable(TAG, Log.VERBOSE)) {
       logV("finished onSizeReady in " + LogTime.getElapsedMillis(startTime));
     }
+  }
+
+  private static int maybeApplySizeMultiplier(int size, float sizeMultiplier) {
+    return size == Target.SIZE_ORIGINAL ? size : Math.round(sizeMultiplier * size);
   }
 
   private boolean canSetResource() {

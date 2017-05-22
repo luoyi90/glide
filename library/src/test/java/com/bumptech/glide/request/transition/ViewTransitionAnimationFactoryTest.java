@@ -11,9 +11,7 @@ import static org.mockito.Mockito.when;
 import android.content.Context;
 import android.view.View;
 import android.view.animation.Animation;
-
 import com.bumptech.glide.load.DataSource;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -25,12 +23,12 @@ import org.robolectric.annotation.Config;
 @Config(manifest = Config.NONE)
 public class ViewTransitionAnimationFactoryTest {
   private ViewTransition.ViewTransitionAnimationFactory viewTransitionAnimationFactory;
-  private ViewAnimationFactory factory;
+  private ViewAnimationFactory<Object> factory;
 
   @Before
   public void setUp() {
     viewTransitionAnimationFactory = mock(ViewTransition.ViewTransitionAnimationFactory.class);
-    factory = new ViewAnimationFactory(viewTransitionAnimationFactory);
+    factory = new ViewAnimationFactory<>(viewTransitionAnimationFactory);
   }
 
   @Test

@@ -1,15 +1,12 @@
 package com.bumptech.glide.load.model;
 
-import android.content.Context;
 import android.util.Log;
-
 import com.bumptech.glide.Priority;
 import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.Options;
 import com.bumptech.glide.load.data.DataFetcher;
 import com.bumptech.glide.signature.ObjectKey;
 import com.bumptech.glide.util.ByteBufferUtil;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -37,8 +34,7 @@ public class ByteBufferFileLoader implements ModelLoader<File, ByteBuffer> {
   public static class Factory implements ModelLoaderFactory<File, ByteBuffer> {
 
     @Override
-    public ModelLoader<File, ByteBuffer> build(Context context,
-        MultiModelLoaderFactory multiFactory) {
+    public ModelLoader<File, ByteBuffer> build(MultiModelLoaderFactory multiFactory) {
       return new ByteBufferFileLoader();
     }
 

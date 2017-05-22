@@ -1,15 +1,12 @@
 package com.bumptech.glide.samples.giphy;
 
-import android.content.Context;
 import android.text.TextUtils;
-
 import com.bumptech.glide.load.Options;
 import com.bumptech.glide.load.model.GlideUrl;
 import com.bumptech.glide.load.model.ModelLoader;
 import com.bumptech.glide.load.model.ModelLoaderFactory;
 import com.bumptech.glide.load.model.MultiModelLoaderFactory;
 import com.bumptech.glide.load.model.stream.BaseGlideUrlLoader;
-
 import java.io.InputStream;
 
 /**
@@ -31,8 +28,7 @@ public class GiphyModelLoader extends BaseGlideUrlLoader<Api.GifResult> {
 
 
     @Override
-    public ModelLoader<Api.GifResult, InputStream> build(Context context,
-        MultiModelLoaderFactory multiFactory) {
+    public ModelLoader<Api.GifResult, InputStream> build(MultiModelLoaderFactory multiFactory) {
       return new GiphyModelLoader(multiFactory.build(GlideUrl.class, InputStream.class));
     }
 

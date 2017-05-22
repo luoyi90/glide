@@ -1,5 +1,7 @@
 package com.bumptech.glide.util.pool;
 
+import com.bumptech.glide.util.Synthetic;
+
 /**
  * Verifies that the job is not in the recycled state.
  */
@@ -20,18 +22,21 @@ public abstract class StateVerifier {
   private StateVerifier() { }
 
   /**
-   * Throws an exception if we believe our object is recycled and inactive (ie is currently in an
+   * Throws an exception if we believe our object is recycled and inactive (i.e. is currently in an
    * object pool).
    */
   public abstract void throwIfRecycled();
 
   /**
-   * Sets whether or not our objet is recycled.
+   * Sets whether or not our object is recycled.
    */
   abstract void setRecycled(boolean isRecycled);
 
   private static class DefaultStateVerifier extends StateVerifier {
     private volatile boolean isReleased;
+
+    @Synthetic
+    DefaultStateVerifier() { }
 
     @Override
     public void throwIfRecycled() {
@@ -49,6 +54,9 @@ public abstract class StateVerifier {
   private static class DebugStateVerifier extends StateVerifier {
     // Keeps track of the stack trace where our state was set to recycled.
     private volatile RuntimeException recycledAtStackTraceException;
+
+    @Synthetic
+    DebugStateVerifier() { }
 
     @Override
     public void throwIfRecycled() {

@@ -1,12 +1,10 @@
 package com.bumptech.glide.load.model;
 
 import android.support.annotation.Nullable;
-
 import com.bumptech.glide.load.Key;
 import com.bumptech.glide.load.Options;
 import com.bumptech.glide.load.data.DataFetcher;
 import com.bumptech.glide.util.Preconditions;
-
 import java.util.Collections;
 import java.util.List;
 
@@ -23,7 +21,7 @@ import java.util.List;
  *
  * This not only avoids having to duplicate dimensions in xml and in your code in order to determine
  * the size of a view on devices with different densities, but also allows you to use layout weights
- * or otherwise programatically put the dimensions of the view without forcing you to fetch a
+ * or otherwise programmatically put the dimensions of the view without forcing you to fetch a
  * generic resource size.
  *
  * The smaller the resource you fetch, the less bandwidth and battery life you use, and the lower

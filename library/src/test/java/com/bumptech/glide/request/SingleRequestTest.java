@@ -1,6 +1,7 @@
 package com.bumptech.glide.request;
 
 import static com.bumptech.glide.tests.Util.isADataSource;
+import static com.bumptech.glide.tests.Util.mockResource;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -19,7 +20,6 @@ import static org.mockito.Mockito.when;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
-
 import com.bumptech.glide.GlideContext;
 import com.bumptech.glide.Priority;
 import com.bumptech.glide.load.DataSource;
@@ -34,7 +34,10 @@ import com.bumptech.glide.request.target.SizeReadyCallback;
 import com.bumptech.glide.request.target.Target;
 import com.bumptech.glide.request.transition.Transition;
 import com.bumptech.glide.request.transition.TransitionFactory;
-
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -43,13 +46,9 @@ import org.mockito.stubbing.Answer;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 @RunWith(RobolectricTestRunner.class)
 @Config(manifest = Config.NONE, sdk = 18)
+@SuppressWarnings("rawtypes")
 public class SingleRequestTest {
   private RequestHarness harness;
 
@@ -57,24 +56,27 @@ public class SingleRequestTest {
    * {@link Number} and {@link List} are arbitrarily chosen types to test some type safety as well.
    * Both are in the middle of the hierarchy having multiple descendants and ancestors.
    */
-  @SuppressWarnings("unchecked")
   private static class RequestHarness {
     Engine engine = mock(Engine.class);
     Number model = 123456;
+    @SuppressWarnings("unchecked")
     Target<List> target = mock(Target.class);
-    Resource<List> resource = mock(Resource.class);
+    Resource<List> resource = mockResource();
     RequestCoordinator requestCoordinator = mock(RequestCoordinator.class);
     Drawable placeholderDrawable = null;
     Drawable errorDrawable = null;
     Drawable fallbackDrawable = null;
+    @SuppressWarnings("unchecked")
     RequestListener<List> requestListener = mock(RequestListener.class);
+    @SuppressWarnings("unchecked")
     TransitionFactory<List> factory = mock(TransitionFactory.class);
     int overrideWidth = -1;
     int overrideHeight = -1;
-    List result = new ArrayList();
+    List<?> result = new ArrayList<>();
     GlideContext glideContext = mock(GlideContext.class);
     Key signature = mock(Key.class);
     Priority priority = Priority.HIGH;
+    boolean useUnlimitedSourceGeneratorsPool = false;
 
     Map<Class<?>, Transformation<?>>  transformations = new HashMap<>();
 
@@ -91,7 +93,8 @@ public class SingleRequestTest {
         .fallback(fallbackDrawable)
         .override(overrideWidth, overrideHeight)
         .priority(priority)
-        .signature(signature);
+        .signature(signature)
+        .useUnlimitedSourceGeneratorsPool(useUnlimitedSourceGeneratorsPool);
       return SingleRequest
           .obtain(glideContext, model, List.class, requestOptions, overrideWidth, overrideHeight,
               priority, target, requestListener, requestCoordinator, engine, factory);
@@ -275,7 +278,7 @@ public class SingleRequestTest {
         .load(eq(harness.glideContext), eq(harness.model), eq(harness.signature), eq(100), eq(100),
             eq(Object.class), eq(List.class), any(Priority.class), any(DiskCacheStrategy.class),
             eq(harness.transformations), anyBoolean(), any(Options.class),
-            anyBoolean(), any(ResourceCallback.class));
+            anyBoolean(), anyBoolean(), anyBoolean(), any(ResourceCallback.class));
   }
 
   @Test
@@ -294,7 +297,7 @@ public class SingleRequestTest {
        .load(eq(harness.glideContext), eq(harness.model), eq(harness.signature), anyInt(), anyInt(),
           eq(Object.class), eq(List.class), any(Priority.class), any(DiskCacheStrategy.class),
           eq(harness.transformations), anyBoolean(), any(Options.class),
-          anyBoolean(), any(ResourceCallback.class)))
+          anyBoolean(), anyBoolean(), anyBoolean(), any(ResourceCallback.class)))
         .thenReturn(loadStatus);
 
     SingleRequest<List> request = harness.getRequest();
@@ -538,7 +541,8 @@ public class SingleRequestTest {
         .load(eq(harness.glideContext), eq(harness.model), eq(harness.signature), anyInt(),
             anyInt(), eq(Object.class), eq(List.class), any(Priority.class),
             any(DiskCacheStrategy.class), eq(harness.transformations), anyBoolean(),
-            any(Options.class), anyBoolean(), any(ResourceCallback.class)))
+            any(Options.class), anyBoolean(), anyBoolean(), anyBoolean(),
+            any(ResourceCallback.class)))
         .thenAnswer(new Answer<Object>() {
           @Override
           public Object answer(InvocationOnMock invocation) throws Throwable {
@@ -652,7 +656,8 @@ public class SingleRequestTest {
         .load(eq(harness.glideContext), eq(harness.model), eq(harness.signature), anyInt(),
             anyInt(), eq(Object.class), eq(List.class), any(Priority.class),
             any(DiskCacheStrategy.class), eq(harness.transformations), anyBoolean(),
-            any(Options.class), anyBoolean(), any(ResourceCallback.class));
+            any(Options.class), anyBoolean(), anyBoolean(), anyBoolean(),
+            any(ResourceCallback.class));
   }
 
   @Test
@@ -674,7 +679,7 @@ public class SingleRequestTest {
         .load(eq(harness.glideContext), eq(harness.model), eq(harness.signature), eq(100), eq(100),
             eq(Object.class), eq(List.class), any(Priority.class), any(DiskCacheStrategy.class),
             eq(harness.transformations), anyBoolean(), any(Options.class),
-            anyBoolean(), any(ResourceCallback.class)))
+            anyBoolean(), anyBoolean(), anyBoolean(), any(ResourceCallback.class)))
         .thenAnswer(new CallResourceCallback(harness.resource));
     SingleRequest<List> request = harness.getRequest();
 
@@ -703,9 +708,48 @@ public class SingleRequestTest {
         .load(eq(harness.glideContext), eq(harness.model), eq(harness.signature), anyInt(),
             anyInt(), eq(Object.class), eq(List.class), any(Priority.class),
             any(DiskCacheStrategy.class), eq(harness.transformations), anyBoolean(),
-            any(Options.class), anyBoolean(), any(ResourceCallback.class));
+            any(Options.class), anyBoolean(), anyBoolean(), anyBoolean(),
+            any(ResourceCallback.class));
   }
 
+
+  @Test
+  public void testCallsSourceUnlimitedExecutorEngineIfOptionsIsSet() {
+    doAnswer(new CallSizeReady(100, 100)).when(harness.target)
+        .getSize(any(SizeReadyCallback.class));
+
+    harness.useUnlimitedSourceGeneratorsPool = true;
+
+    SingleRequest<List> request = harness.getRequest();
+    request.begin();
+
+    verify(harness.engine)
+        .load(eq(harness.glideContext), eq(harness.model), eq(harness.signature), anyInt(),
+            anyInt(), eq(Object.class), eq(List.class), any(Priority.class),
+            any(DiskCacheStrategy.class), eq(harness.transformations), anyBoolean(),
+            any(Options.class), anyBoolean(), eq(Boolean.TRUE), anyBoolean(),
+            any(ResourceCallback.class));
+  }
+
+  @Test
+  public void testCallsSourceExecutorEngineIfOptionsIsSet() {
+    doAnswer(new CallSizeReady(100, 100)).when(harness.target)
+        .getSize(any(SizeReadyCallback.class));
+
+    harness.useUnlimitedSourceGeneratorsPool = false;
+
+    SingleRequest<List> request = harness.getRequest();
+    request.begin();
+
+    verify(harness.engine)
+        .load(eq(harness.glideContext), eq(harness.model), eq(harness.signature), anyInt(),
+            anyInt(), eq(Object.class), eq(List.class), any(Priority.class),
+            any(DiskCacheStrategy.class), eq(harness.transformations), anyBoolean(),
+            any(Options.class), anyBoolean(), eq(Boolean.FALSE), anyBoolean(),
+            any(ResourceCallback.class));
+  }
+
+  // TODO do we want to move these to Util?
   @SuppressWarnings("unchecked")
   private static <T> Transition<T> mockTransition() {
     return mock(Transition.class);
@@ -789,6 +833,11 @@ public class SingleRequestTest {
 
     @Override
     public void getSize(SizeReadyCallback cb) {
+    }
+
+    @Override
+    public void removeCallback(SizeReadyCallback cb) {
+      // Do nothing.
     }
 
     @Override
